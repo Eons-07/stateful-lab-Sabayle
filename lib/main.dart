@@ -23,6 +23,8 @@ class _CartScreenState extends State<CartScreen> {
   final List<CartItem> _items = [];
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
+  String? _nameError; // shown under the name field when validation fails
+  String? _priceError; // shown under the price field when validation fails
 
   // Runs once when the screen is created: preload the 3 sample items.
   @override
@@ -43,6 +45,22 @@ class _CartScreenState extends State<CartScreen> {
   void _increase(int i) => setState(() { if (_items[i].quantity < 99) _items[i].quantity++; }); // plus stops at 99
   void _decrease(int i) => setState(() { if (_items[i].quantity > 1) _items[i].quantity--; }); // minus never goes below 1
   void _toggle(int i) => setState(() => _items[i].gotIt = !_items[i].gotIt);
+  void _clearChecked() => setState(() => _items.removeWhere((item) => item.gotIt));
+
+  // Validates both fields: the name must not be empty and the price must be a number above 0.
+  void _addItem() {
+    final name = _nameController.text.trim();
+    final price = double.tryParse(_priceController.text.trim()); // null when the text is not a number
+    setState(() {
+      _nameError = name.isEmpty ? 'Enter an item name' : null;
+      _priceError = (price == null || price <= 0) ? 'Enter a price above 0' : null;
+      if (_nameError == null && _priceError == null) {
+        _items.add(CartItem(name: name, price: price!));
+        _nameController.clear();
+        _priceController.clear();
+      }
+    });
+  }
 
   // Derived values are computed from _items every build, so the summary is always live.
   int get _gotCount => _items.where((item) => item.gotIt).length;
@@ -53,28 +71,56 @@ class _CartScreenState extends State<CartScreen> {
     final color = Theme.of(context).colorScheme.primary;
     return Scaffold(
       appBar: AppBar(title: const Text('Mini Shopping Cart'), backgroundColor: color, foregroundColor: Colors.white),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Expanded gives the ListView a bounded height inside the Column.
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: _items.length,
+                itemBuilder: (context, i) => CartItemTile(item: _items[i], onIncrease: () => _increase(i), onDecrease: () => _decrease(i), onToggle: () => _toggle(i)),
+              ),
+            ),
+            // Summary bar: item count, got-it count and the live total.
+            Container(
+              width: double.infinity,
+              color: color.withValues(alpha: 0.12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Items: ${_items.length}  •  Got it: $_gotCount'),
+                  Text('Total: PHP ${_total.toStringAsFixed(2)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+                ],
+              ),
+            ),
+            // Add item form: two fields with validation errors, then the Add and Clear checked buttons.
+            Padding(
               padding: const EdgeInsets.all(12),
-              itemCount: _items.length,
-              itemBuilder: (context, i) => CartItemTile(item: _items[i], onIncrease: () => _increase(i), onDecrease: () => _decrease(i), onToggle: () => _toggle(i)),
+              child: Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 3, child: TextField(controller: _nameController, decoration: InputDecoration(labelText: 'Item name', errorText: _nameError, border: const OutlineInputBorder(), isDense: true))),
+                      const SizedBox(width: 8),
+                      Expanded(flex: 2, child: TextField(controller: _priceController, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: 'Price', errorText: _priceError, border: const OutlineInputBorder(), isDense: true))),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(child: FilledButton(onPressed: _addItem, child: const Text('Add'))),
+                      const SizedBox(width: 8),
+                      Expanded(child: OutlinedButton(onPressed: _clearChecked, child: const Text('Clear checked'))),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-          Container(
-            width: double.infinity,
-            color: color.withValues(alpha: 0.12),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Items: ${_items.length}  •  Got it: $_gotCount'),
-                Text('Total: PHP ${_total.toStringAsFixed(2)}', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
