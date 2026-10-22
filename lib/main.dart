@@ -39,6 +39,11 @@ class _CartScreenState extends State<CartScreen> {
     super.dispose();
   }
 
+  // Every change to _items or to an item's fields happens inside setState so the screen rebuilds.
+  void _increase(int i) => setState(() { if (_items[i].quantity < 99) _items[i].quantity++; }); // plus stops at 99
+  void _decrease(int i) => setState(() { if (_items[i].quantity > 1) _items[i].quantity--; }); // minus never goes below 1
+  void _toggle(int i) => setState(() => _items[i].gotIt = !_items[i].gotIt);
+
   // Derived values are computed from _items every build, so the summary is always live.
   int get _gotCount => _items.where((item) => item.gotIt).length;
   double get _total => _items.fold(0.0, (sum, item) => sum + item.price * item.quantity);
@@ -54,7 +59,7 @@ class _CartScreenState extends State<CartScreen> {
             child: ListView.builder(
               padding: const EdgeInsets.all(12),
               itemCount: _items.length,
-              itemBuilder: (context, i) => ListTile(title: Text(_items[i].name), subtitle: Text('PHP ${_items[i].price.toStringAsFixed(2)} x ${_items[i].quantity}')),
+              itemBuilder: (context, i) => CartItemTile(item: _items[i], onIncrease: () => _increase(i), onDecrease: () => _decrease(i), onToggle: () => _toggle(i)),
             ),
           ),
           Container(
@@ -73,4 +78,38 @@ class _CartScreenState extends State<CartScreen> {
       ),
     );
   }
+}
+
+// Stateless: it only displays the CartItem it is given and reports taps through callbacks; it never calls setState because the parent owns the data.
+class CartItemTile extends StatelessWidget {
+  final CartItem item;
+  final VoidCallback onIncrease;
+  final VoidCallback onDecrease;
+  final VoidCallback onToggle;
+  const CartItemTile({super.key, required this.item, required this.onIncrease, required this.onDecrease, required this.onToggle});
+  @override
+  Widget build(BuildContext context) => Card(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            children: [
+              Checkbox(value: item.gotIt, onChanged: (_) => onToggle()),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Line-through and grey text when the item is checked.
+                    Text(item.name, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, decoration: item.gotIt ? TextDecoration.lineThrough : null, color: item.gotIt ? Colors.grey : null)),
+                    Text('PHP ${item.price.toStringAsFixed(2)} each', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+                  ],
+                ),
+              ),
+              IconButton.outlined(onPressed: onDecrease, icon: const Icon(Icons.remove)),
+              SizedBox(width: 28, child: Text('${item.quantity}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+              IconButton.outlined(onPressed: onIncrease, icon: const Icon(Icons.add)),
+            ],
+          ),
+        ),
+      );
 }
